@@ -3,7 +3,7 @@ require_once '../includes/auth.php';
 require_once '../includes/koneksi.php';
 $active = 'aparatur';
 $id     = (int) $_GET['id'];
-$data   = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT * FROM aparatur WHERE id_aparatur = $id"));
+$data   = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT * FROM aparatur WHERE id_aparatur=$id"));
 if (!$data) { header("Location: aparatur.php"); exit; }
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nama    = mysqli_real_escape_string($koneksi, $_POST['nama']);
@@ -32,8 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
       <a href="index.php">&#9632; Dashboard</a>
       <a href="aparatur.php" class="active">&#9632; Data Aparatur</a>
       <a href="kriteria.php">&#9632; Data Kriteria</a>
-      <a href="kehadiran.php">&#9632; Kehadiran</a>
-      <a href="penilaian.php">&#9632; Penilaian</a>
+      <a href="kehadiran.php">&#9632; Ketidakhadiran</a>
+      <a href="penilaian.php">&#9632; Rekap Penilaian</a>
       <a href="perhitungan_saw.php">&#9632; Perhitungan SAW</a>
       <a href="kelola_user.php">&#9632; Kelola User</a>
       <div class="nav-section">Akun</div>
@@ -56,8 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <span class="breadcrumb-active">Edit</span>
       </div>
       <div class="page-header">
-        <div><div class="page-title">Edit Aparatur</div>
-        <div class="page-sub">Perbarui data: <strong><?php echo htmlspecialchars($data['nama']); ?></strong></div></div>
+        <div>
+          <div class="page-title">Edit Aparatur</div>
+          <div class="page-sub">Perbarui data: <strong><?php echo htmlspecialchars($data['nama']); ?></strong></div>
+        </div>
       </div>
       <div class="card" style="max-width:520px;">
         <div class="card-head"><div class="card-head-title">Form Edit Aparatur</div></div>

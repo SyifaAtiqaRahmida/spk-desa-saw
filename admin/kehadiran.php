@@ -16,8 +16,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     header("Location: kehadiran.php?pesan=simpan"); exit;
 }
 $aparatur  = mysqli_query($koneksi, "SELECT * FROM aparatur ORDER BY nama");
-$rekap     = mysqli_query($koneksi, "SELECT a.nama, a.jabatan, COUNT(k.id_kehadiran) as total_tidak_hadir, SUM(k.status = 'izin') as izin, SUM(k.status = 'sakit') as sakit, SUM(k.status = 'alpha') as alpha FROM aparatur a LEFT JOIN kehadiran k ON a.id_aparatur = k.id_aparatur GROUP BY a.id_aparatur ORDER BY total_tidak_hadir DESC");
-$kehadiran = mysqli_query($koneksi, "SELECT k.id_kehadiran, a.nama, k.tanggal, k.status, k.keterangan FROM kehadiran k JOIN aparatur a ON k.id_aparatur = a.id_aparatur ORDER BY k.tanggal DESC, a.nama");
+$rekap     = mysqli_query($koneksi, "
+    SELECT a.nama, a.jabatan,
+        COUNT(k.id_kehadiran) as total_tidak_hadir,
+        SUM(k.status = 'izin')  as izin,
+        SUM(k.status = 'sakit') as sakit,
+        SUM(k.status = 'alpha') as alpha
+    FROM aparatur a
+    LEFT JOIN kehadiran k ON a.id_aparatur = k.id_aparatur
+    GROUP BY a.id_aparatur
+    ORDER BY total_tidak_hadir DESC
+");
+$kehadiran = mysqli_query($koneksi, "
+    SELECT k.id_kehadiran, a.nama, k.tanggal, k.status, k.keterangan
+    FROM kehadiran k
+    JOIN aparatur a ON k.id_aparatur = a.id_aparatur
+    ORDER BY k.tanggal DESC, a.nama
+");
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -39,7 +54,7 @@ $kehadiran = mysqli_query($koneksi, "SELECT k.id_kehadiran, a.nama, k.tanggal, k
       <a href="index.php"           class="<?php echo $active=='dashboard' ? 'active' : ''; ?>">&#9632; Dashboard</a>
       <a href="aparatur.php"        class="<?php echo $active=='aparatur'  ? 'active' : ''; ?>">&#9632; Data Aparatur</a>
       <a href="kriteria.php"        class="<?php echo $active=='kriteria'  ? 'active' : ''; ?>">&#9632; Data Kriteria</a>
-      <a href="kehadiran.php"       class="<?php echo $active=='kehadiran' ? 'active' : ''; ?>">&#9632; Kehadiran</a>
+      <a href="kehadiran.php"       class="<?php echo $active=='kehadiran' ? 'active' : ''; ?>">&#9632; Ketidakhadiran</a>
       <a href="penilaian.php"       class="<?php echo $active=='penilaian' ? 'active' : ''; ?>">&#9632; Penilaian</a>
       <a href="perhitungan_saw.php" class="<?php echo $active=='saw'       ? 'active' : ''; ?>">&#9632; Perhitungan SAW</a>
       <a href="kelola_user.php"     class="<?php echo $active=='user'      ? 'active' : ''; ?>">&#9632; Kelola User</a>
@@ -50,7 +65,7 @@ $kehadiran = mysqli_query($koneksi, "SELECT k.id_kehadiran, a.nama, k.tanggal, k
   </aside>
   <div class="main">
     <header class="topbar">
-      <div class="topbar-title">Kehadiran</div>
+      <div class="topbar-title">Ketidakhadiran</div>
       <div class="topbar-right">
         <span class="topbar-user"><?php echo htmlspecialchars($_SESSION['nama']); ?></span>
         <div class="avatar"><?php echo strtoupper(substr($_SESSION['nama'], 0, 1)); ?></div>
@@ -59,15 +74,19 @@ $kehadiran = mysqli_query($koneksi, "SELECT k.id_kehadiran, a.nama, k.tanggal, k
     <main class="content">
       <div class="breadcrumb">
         <a href="index.php">Beranda</a><span class="breadcrumb-sep">/</span>
-        <span class="breadcrumb-active">Kehadiran</span>
+        <span class="breadcrumb-active">Ketidakhadiran</span>
       </div>
       <div class="page-header">
-        <div><div class="page-title">Input Ketidakhadiran Aparatur</div>
-        <div class="page-sub">Catat hanya jika aparatur <strong>tidak hadir</strong> — yang tidak diinput dianggap hadir</div></div>
+        <div>
+          <div class="page-title">Input Ketidakhadiran Aparatur</div>
+          <div class="page-sub">Catat hanya jika aparatur <strong>tidak hadir</strong> — yang tidak diinput dianggap hadir</div>
+        </div>
       </div>
-      <div class="alert alert-info">&#9432; Kriteria <strong>Kehadiran</strong> menggunakan atribut <strong>Cost</strong> — semakin sedikit ketidakhadiran, semakin tinggi nilainya dalam perhitungan SAW.</div>
+      <div class="alert alert-info">&#9432; Kriteria <strong>Ketidakhadiran</strong> menggunakan atribut <strong>Cost</strong> — semakin sedikit ketidakhadiran, semakin tinggi nilainya dalam perhitungan SAW.</div>
       <?php if (isset($_GET['pesan']) && $_GET['pesan'] == 'simpan'): ?><div class="alert alert-success">Data ketidakhadiran berhasil disimpan.</div><?php endif; ?>
       <?php if (isset($_GET['pesan']) && $_GET['pesan'] == 'hapus'): ?><div class="alert alert-danger">Data ketidakhadiran berhasil dihapus.</div><?php endif; ?>
+
+      <!-- Form Input -->
       <div class="card" style="max-width:560px; margin-bottom:28px;">
         <div class="card-head"><div class="card-head-title">Form Input Ketidakhadiran</div></div>
         <div class="card-body">
@@ -102,6 +121,8 @@ $kehadiran = mysqli_query($koneksi, "SELECT k.id_kehadiran, a.nama, k.tanggal, k
           </form>
         </div>
       </div>
+
+      <!-- Rekap -->
       <div class="card" style="margin-bottom:24px;">
         <div class="card-head"><div class="card-head-title">Rekapitulasi Ketidakhadiran</div></div>
         <div class="table-wrap">
@@ -131,6 +152,8 @@ $kehadiran = mysqli_query($koneksi, "SELECT k.id_kehadiran, a.nama, k.tanggal, k
           </table>
         </div>
       </div>
+
+      <!-- Detail -->
       <div class="card">
         <div class="card-head">
           <div class="card-head-title">Detail Ketidakhadiran</div>

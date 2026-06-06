@@ -1,12 +1,17 @@
 <?php
+// Session khusus aparatur - terpisah dari session lain
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-if (isset($_SESSION['user']))        { header("Location: admin/index.php");           exit; }
-if (isset($_SESSION['kepala_desa'])) { header("Location: kepala_desa/dashboard.php"); exit; }
+// Kalau sudah login sebagai aparatur, langsung ke dashboard
+if (isset($_SESSION['aparatur'])) {
+    header("Location: dashboard.php");
+    exit;
+}
 
-require_once 'includes/koneksi.php';
+// Kalau ada session lain (admin/kepala_desa), JANGAN redirect - biarkan aparatur login sendiri
+require_once '../includes/koneksi.php';
 
 $error = '';
 
@@ -14,23 +19,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = mysqli_real_escape_string($koneksi, $_POST['username']);
     $password = $_POST['password'];
 
-    $query = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT * FROM user WHERE username='$username'"));
+    // Cari di tabel user dengan role aparatur
+    $query = mysqli_fetch_assoc(mysqli_query($koneksi, "
+        SELECT u.*, a.nama as nama_aparatur, a.jabatan
+        FROM user u
+        JOIN aparatur a ON u.id_aparatur = a.id_aparatur
+        WHERE u.username='$username' AND u.role='aparatur'
+    "));
 
     if ($query && password_verify($password, $query['password'])) {
-        if ($query['role'] == 'kepala_desa') {
-            $_SESSION['kepala_desa']      = $query['id_user'];
-            $_SESSION['kepala_desa_nama'] = $query['nama'];
-            header("Location: kepala_desa/dashboard.php");
-            exit;
-        } elseif ($query['role'] == 'admin') {
-            $_SESSION['user']     = $query['id_user'];
-            $_SESSION['username'] = $query['username'];
-            $_SESSION['nama']     = $query['nama'];
-            header("Location: admin/index.php");
-            exit;
-        } elseif ($query['role'] == 'aparatur') {
-            $error = "Gunakan halaman login aparatur!";
-        }
+        // Set session aparatur
+        $_SESSION['aparatur']         = $query['id_aparatur'];
+        $_SESSION['aparatur_nama']    = $query['nama_aparatur'];
+        $_SESSION['aparatur_jabatan'] = $query['jabatan'];
+        header("Location: dashboard.php");
+        exit;
     } else {
         $error = "Username atau password salah!";
     }
@@ -41,21 +44,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — SPK Desa Tatah Mesjid</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Login Aparatur — SPK Desa Tatah Mesjid</title>
+  <link rel="stylesheet" href="../style.css">
   <style>body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--gray-100); }</style>
 </head>
 <body>
 <div style="width:100%; max-width:400px; padding:16px;">
   <div style="text-align:center; margin-bottom:28px;">
     <div style="display:inline-flex; align-items:center; justify-content:center; width:56px; height:56px; background:var(--green-dark); border-radius:var(--radius-lg); margin-bottom:14px;">
-      <span style="font-size:24px;">&#127963;</span>
+      <span style="font-size:24px;">&#128100;</span>
     </div>
-    <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--gray-500); margin-bottom:4px;">Sistem Pendukung Keputusan</div>
+    <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--gray-500); margin-bottom:4px;">Portal Aparatur Desa</div>
     <div style="font-size:20px; font-weight:700; color:var(--gray-900);">SPK Desa Tatah Mesjid</div>
   </div>
   <div class="card">
-    <div class="card-head"><div class="card-head-title">Masuk ke Sistem</div></div>
+    <div class="card-head"><div class="card-head-title">Masuk sebagai Aparatur</div></div>
     <div class="card-body">
       <?php if ($error): ?>
         <div class="alert alert-danger"><?php echo $error; ?></div>
@@ -73,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">Masuk</button>
       </form>
       <div style="text-align:center; margin-top:16px; font-size:12px; color:var(--gray-500);">
-        <a href="aparatur/login.php">Login sebagai Aparatur</a>
+        <a href="../login.php">Login sebagai Admin / Kepala Desa</a>
       </div>
     </div>
   </div>

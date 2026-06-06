@@ -2,7 +2,12 @@
 require_once '../includes/auth.php';
 require_once '../includes/koneksi.php';
 $active = 'aparatur';
-$query  = mysqli_query($koneksi, "SELECT * FROM aparatur");
+$query  = mysqli_query($koneksi, "
+    SELECT a.*, u.username, u.id_user
+    FROM aparatur a
+    LEFT JOIN user u ON a.id_aparatur = u.id_aparatur AND u.role='aparatur'
+    ORDER BY a.nama
+");
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -43,14 +48,13 @@ $query  = mysqli_query($koneksi, "SELECT * FROM aparatur");
     </header>
     <main class="content">
       <div class="breadcrumb">
-        <a href="index.php">Beranda</a>
-        <span class="breadcrumb-sep">/</span>
+        <a href="index.php">Beranda</a><span class="breadcrumb-sep">/</span>
         <span class="breadcrumb-active">Data Aparatur</span>
       </div>
       <div class="page-header">
         <div>
           <div class="page-title">Data Aparatur Desa Tatah Mesjid</div>
-          <div class="page-sub">Kelola data aparatur yang akan dinilai dalam sistem SAW</div>
+          <div class="page-sub">Kelola data aparatur dan atur akses login mereka</div>
         </div>
         <a href="tambah_aparatur.php" class="btn btn-primary">+ Tambah Aparatur</a>
       </div>
@@ -72,21 +76,30 @@ $query  = mysqli_query($koneksi, "SELECT * FROM aparatur");
                 <th style="width:50px">No</th>
                 <th>Nama</th>
                 <th>Jabatan</th>
-                <th style="width:160px; text-align:center">Aksi</th>
+                <th style="width:130px; text-align:center">Akses Login</th>
+                <th style="width:230px; text-align:center">Aksi</th>
               </tr>
             </thead>
             <tbody>
               <?php if (mysqli_num_rows($query) == 0): ?>
-                <tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">&#128100;</div><div class="empty-state-title">Belum ada data aparatur</div></div></td></tr>
+                <tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">&#128100;</div><div class="empty-state-title">Belum ada data aparatur</div></div></td></tr>
               <?php else: ?>
                 <?php $no = 1; while ($row = mysqli_fetch_assoc($query)): ?>
                 <tr>
                   <td class="text-muted text-center"><?php echo $no++; ?></td>
                   <td style="font-weight:500"><?php echo htmlspecialchars($row['nama']); ?></td>
                   <td><span class="badge badge-green"><?php echo htmlspecialchars($row['jabatan']); ?></span></td>
+                  <td class="text-center">
+                    <?php if ($row['username']): ?>
+                      <span class="badge badge-green">&#10003; <?php echo htmlspecialchars($row['username']); ?></span>
+                    <?php else: ?>
+                      <span class="badge badge-gray">Belum diset</span>
+                    <?php endif; ?>
+                  </td>
                   <td>
                     <div class="d-flex gap-1 justify-center">
                       <a href="edit_aparatur.php?id=<?php echo $row['id_aparatur']; ?>" class="btn btn-outline btn-sm">Edit</a>
+                      <a href="set_akses_aparatur.php?id=<?php echo $row['id_aparatur']; ?>" class="btn btn-primary btn-sm">Set Akses</a>
                       <a href="hapus_aparatur.php?id=<?php echo $row['id_aparatur']; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Yakin hapus data ini?')">Hapus</a>
                     </div>
                   </td>

@@ -2,11 +2,23 @@
 require_once '../includes/auth.php';
 require_once '../includes/koneksi.php';
 $active = 'aparatur';
+$error  = '';
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $nama    = mysqli_real_escape_string($koneksi, $_POST['nama']);
-    $jabatan = mysqli_real_escape_string($koneksi, $_POST['jabatan']);
-    mysqli_query($koneksi, "INSERT INTO aparatur (nama, jabatan) VALUES ('$nama', '$jabatan')");
-    header("Location: aparatur.php?pesan=tambah"); exit;
+    $nama     = mysqli_real_escape_string($koneksi, $_POST['nama']);
+    $jabatan  = mysqli_real_escape_string($koneksi, $_POST['jabatan']);
+    $username = mysqli_real_escape_string($koneksi, $_POST['username']);
+    $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+
+    $cek = mysqli_fetch_assoc(mysqli_query($koneksi, "SELECT * FROM user WHERE username='$username'"));
+    if ($cek) {
+        $error = 'Username sudah dipakai! Gunakan username lain.';
+    } else {
+        mysqli_query($koneksi, "INSERT INTO aparatur (nama, jabatan) VALUES ('$nama', '$jabatan')");
+        $id_aparatur = mysqli_insert_id($koneksi);
+        mysqli_query($koneksi, "INSERT INTO user (nama, username, password, role, id_aparatur) VALUES ('$nama', '$username', '$password', 'aparatur', $id_aparatur)");
+        header("Location: aparatur.php?pesan=tambah"); exit;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -29,8 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
       <a href="index.php">&#9632; Dashboard</a>
       <a href="aparatur.php" class="active">&#9632; Data Aparatur</a>
       <a href="kriteria.php">&#9632; Data Kriteria</a>
-      <a href="kehadiran.php">&#9632; Kehadiran</a>
-      <a href="penilaian.php">&#9632; Penilaian</a>
+      <a href="kehadiran.php">&#9632; Ketidakhadiran</a>
+      <a href="penilaian.php">&#9632; Rekap Penilaian</a>
       <a href="perhitungan_saw.php">&#9632; Perhitungan SAW</a>
       <a href="kelola_user.php">&#9632; Kelola User</a>
       <div class="nav-section">Akun</div>
@@ -53,19 +65,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <span class="breadcrumb-active">Tambah</span>
       </div>
       <div class="page-header">
-        <div><div class="page-title">Tambah Aparatur</div><div class="page-sub">Tambahkan data aparatur baru</div></div>
+        <div>
+          <div class="page-title">Tambah Aparatur</div>
+          <div class="page-sub">Data aparatur + akun login akan dibuat sekaligus</div>
+        </div>
       </div>
       <div class="card" style="max-width:520px;">
         <div class="card-head"><div class="card-head-title">Form Data Aparatur</div></div>
         <div class="card-body">
+          <?php if ($error): ?><div class="alert alert-danger"><?php echo $error; ?></div><?php endif; ?>
           <form method="POST">
             <div class="form-group">
               <label class="form-label">Nama Aparatur</label>
-              <input type="text" name="nama" class="form-control" placeholder="Masukkan nama lengkap" required>
+              <input type="text" name="nama" class="form-control" placeholder="Masukkan nama lengkap" required
+                     value="<?php echo isset($_POST['nama']) ? htmlspecialchars($_POST['nama']) : ''; ?>">
             </div>
             <div class="form-group">
               <label class="form-label">Jabatan</label>
-              <input type="text" name="jabatan" class="form-control" placeholder="Contoh: Sekdes, Kasi, Kaur..." required>
+              <input type="text" name="jabatan" class="form-control" placeholder="Contoh: Sekdes, Kasi, Kaur..." required
+                     value="<?php echo isset($_POST['jabatan']) ? htmlspecialchars($_POST['jabatan']) : ''; ?>">
+            </div>
+            <div style="border-top:1px solid #f0f0f0; padding-top:16px; margin-top:4px;">
+              <div style="font-size:12px; font-weight:600; color:var(--gray-500); margin-bottom:12px;">AKUN LOGIN APARATUR</div>
+              <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" placeholder="Buat username untuk aparatur" required
+                       value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-control" placeholder="Buat password" required>
+              </div>
             </div>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary">Simpan Data</button>

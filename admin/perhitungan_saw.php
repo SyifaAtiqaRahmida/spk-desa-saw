@@ -1,32 +1,120 @@
 <?php
 require_once '../includes/auth.php';
 require_once '../includes/koneksi.php';
+
 $active = 'saw';
 $hasil  = [];
-$aparatur = mysqli_query($koneksi, "SELECT * FROM aparatur");
-while ($a = mysqli_fetch_array($aparatur)) {
+
+// Ambil semua aparatur
+$aparatur_list = mysqli_query($koneksi, "SELECT * FROM aparatur");
+
+while ($a = mysqli_fetch_array($aparatur_list)) {
     $id_aparatur = $a['id_aparatur'];
     $nama        = $a['nama'];
+    $jabatan     = $a['jabatan'];
     $total       = 0;
-    $kriteria = mysqli_query($koneksi, "SELECT * FROM kriteria");
-    while ($k = mysqli_fetch_array($kriteria)) {
-        $id_kriteria = $k['id_kriteria'];
-        $bobot       = $k['bobot'];
-        $atribut     = $k['atribut'];
-        $nilai      = mysqli_query($koneksi, "SELECT nilai FROM penilaian WHERE id_aparatur='$id_aparatur' AND id_kriteria='$id_kriteria'");
-        $n          = mysqli_fetch_array($nilai);
-        $nilai_asli = $n['nilai'] ?? 0;
-        $max = mysqli_fetch_array(mysqli_query($koneksi, "SELECT MAX(nilai) as max FROM penilaian WHERE id_kriteria='$id_kriteria'"));
-        $min = mysqli_fetch_array(mysqli_query($koneksi, "SELECT MIN(nilai) as min FROM penilaian WHERE id_kriteria='$id_kriteria'"));
-        if ($atribut == 'benefit') {
-            $normalisasi = $nilai_asli / ($max['max'] ?: 1);
+    $detail      = [];
+
+    // Ambil semua kriteria
+    $kriteria_list = mysqli_query($koneksi, "SELECT * FROM kriteria");
+
+    while ($k = mysqli_fetch_array($kriteria_list)) {
+        $id_kriteria    = $k['id_kriteria'];
+        $bobot          = $k['bobot'];
+        $atribut        = $k['atribut'];
+        $nama_kriteria  = $k['nama_kriteria'];
+
+        // Cek apakah kriteria ini adalah ketidakhadiran
+        if (strtolower($nama_kriteria) == 'ketidakhadiran') {
+            // Nilai dari jumlah hari tidak hadir di tabel kehadiran
+            $row_nilai = mysqli_fetch_assoc(mysqli_query($koneksi, "
+                SELECT COUNT(*) as nilai FROM kehadiran
+                WHERE id_aparatur=$id_aparatur
+            "));
+            $nilai_asli = $row_nilai['nilai'] ?? 0;
+            // Kalau tidak ada ketidakhadiran, nilai = 0 (terbaik untuk Cost)
+            // Tambah 1 biar tidak ada pembagian 0
+            $nilai_asli = $nilai_asli;
         } else {
-            $normalisasi = ($min['min'] ?: 1) / ($nilai_asli ?: 1);
+            // Nilai dari jumlah jobdesk yang DISETUJUI per kriteria
+            $row_nilai = mysqli_fetch_assoc(mysqli_query($koneksi, "
+                SELECT COUNT(*) as nilai FROM jobdesk
+                WHERE id_aparatur=$id_aparatur
+                AND id_kriteria=$id_kriteria
+                AND status='disetujui'
+            "));
+            $nilai_asli = $row_nilai['nilai'] ?? 0;
         }
-        $total += $normalisasi * $bobot;
+
+        // Ambil max dan min untuk normalisasi
+        if (strtolower($nama_kriteria) == 'ketidakhadiran') {
+            $max = mysqli_fetch_assoc(mysqli_query($koneksi, "
+                SELECT COUNT(*) as max FROM kehadiran
+                GROUP BY id_aparatur
+                ORDER BY COUNT(*) DESC
+                LIMIT 1
+            "));
+            $min = mysqli_fetch_assoc(mysqli_query($koneksi, "
+                SELECT COUNT(*) as min FROM kehadiran
+                GROUP BY id_aparatur
+                ORDER BY COUNT(*) ASC
+                LIMIT 1
+            "));
+            $max_val = $max['max'] ?? 0;
+            $min_val = $min['min'] ?? 0;
+        } else {
+            $max = mysqli_fetch_assoc(mysqli_query($koneksi, "
+                SELECT COUNT(*) as max FROM jobdesk
+                WHERE id_kriteria=$id_kriteria AND status='disetujui'
+                GROUP BY id_aparatur
+                ORDER BY COUNT(*) DESC
+                LIMIT 1
+            "));
+            $min = mysqli_fetch_assoc(mysqli_query($koneksi, "
+                SELECT COUNT(*) as min FROM jobdesk
+                WHERE id_kriteria=$id_kriteria AND status='disetujui'
+                GROUP BY id_aparatur
+                ORDER BY COUNT(*) ASC
+                LIMIT 1
+            "));
+            $max_val = $max['max'] ?? 0;
+            $min_val = $min['min'] ?? 0;
+        }
+
+        // Normalisasi SAW
+        if ($atribut == 'benefit') {
+            $normalisasi = $max_val > 0 ? $nilai_asli / $max_val : 0;
+        } else {
+            // Cost: kalau nilai 0 (tidak pernah tidak hadir) = terbaik = 1
+            if ($nilai_asli == 0) {
+                $normalisasi = 1;
+            } else {
+                $normalisasi = $min_val > 0 ? $min_val / $nilai_asli : 0;
+            }
+        }
+
+        $skor  = round($normalisasi * $bobot, 4);
+        $total += $skor;
+
+        $detail[] = [
+            'nama'        => $nama_kriteria,
+            'atribut'     => $atribut,
+            'bobot'       => $bobot,
+            'nilai'       => $nilai_asli,
+            'normalisasi' => round($normalisasi, 4),
+            'skor'        => $skor,
+        ];
     }
-    $hasil[] = ['nama' => $nama, 'nilai' => $total];
+
+    $hasil[] = [
+        'nama'    => $nama,
+        'jabatan' => $jabatan,
+        'nilai'   => round($total, 4),
+        'detail'  => $detail,
+    ];
 }
+
+// Urutkan dari terbesar
 usort($hasil, function ($a, $b) { return $b['nilai'] <=> $a['nilai']; });
 ?>
 <!DOCTYPE html>
@@ -49,7 +137,7 @@ usort($hasil, function ($a, $b) { return $b['nilai'] <=> $a['nilai']; });
       <a href="index.php"           class="<?php echo $active=='dashboard' ? 'active' : ''; ?>">&#9632; Dashboard</a>
       <a href="aparatur.php"        class="<?php echo $active=='aparatur'  ? 'active' : ''; ?>">&#9632; Data Aparatur</a>
       <a href="kriteria.php"        class="<?php echo $active=='kriteria'  ? 'active' : ''; ?>">&#9632; Data Kriteria</a>
-      <a href="kehadiran.php"       class="<?php echo $active=='kehadiran' ? 'active' : ''; ?>">&#9632; Kehadiran</a>
+      <a href="kehadiran.php"       class="<?php echo $active=='kehadiran' ? 'active' : ''; ?>">&#9632; Ketidakhadiran</a>
       <a href="penilaian.php"       class="<?php echo $active=='penilaian' ? 'active' : ''; ?>">&#9632; Penilaian</a>
       <a href="perhitungan_saw.php" class="<?php echo $active=='saw'       ? 'active' : ''; ?>">&#9632; Perhitungan SAW</a>
       <a href="kelola_user.php"     class="<?php echo $active=='user'      ? 'active' : ''; ?>">&#9632; Kelola User</a>
@@ -68,24 +156,39 @@ usort($hasil, function ($a, $b) { return $b['nilai'] <=> $a['nilai']; });
     </header>
     <main class="content">
       <div class="breadcrumb">
-        <a href="index.php">Beranda</a><span class="breadcrumb-sep">/</span>
+        <a href="index.php">Beranda</a>
+        <span class="breadcrumb-sep">/</span>
         <span class="breadcrumb-active">Perhitungan SAW</span>
       </div>
+
       <div class="page-header">
-        <div><div class="page-title">Hasil Perhitungan SAW</div>
-        <div class="page-sub">Ranking aparatur terbaik berdasarkan metode Simple Additive Weighting</div></div>
+        <div>
+          <div class="page-title">Hasil Perhitungan SAW</div>
+          <div class="page-sub">Nilai dihitung otomatis dari jobdesk yang disetujui & data ketidakhadiran</div>
+        </div>
       </div>
+
+      <!-- Info cara hitung -->
+      <div class="alert alert-info" style="margin-bottom:20px;">
+        &#9432; <strong>Cara perhitungan:</strong>
+        Nilai kriteria (Kualitas Kerja, Kerja Sama, Pelayanan) = jumlah jobdesk yang <strong>disetujui</strong> Kepala Desa.
+        Nilai Ketidakhadiran = jumlah hari tidak hadir (semakin sedikit semakin bagus).
+      </div>
+
+      <!-- Winner Banner -->
       <?php if (!empty($hasil)): ?>
-      <div class="winner-banner">
+      <div class="winner-banner" style="margin-bottom:24px;">
         <div>
           <div class="winner-label">&#127942; Aparatur Terbaik</div>
           <div class="winner-name"><?php echo htmlspecialchars($hasil[0]['nama']); ?></div>
-          <div style="font-size:13px; color:var(--green-light); margin-top:4px;">Peringkat 1 &mdash; Nilai tertinggi</div>
+          <div style="font-size:13px; color:var(--green-light); margin-top:4px;"><?php echo htmlspecialchars($hasil[0]['jabatan']); ?> &mdash; Nilai tertinggi</div>
         </div>
-        <div class="winner-score"><?php echo round($hasil[0]['nilai'], 3); ?></div>
+        <div class="winner-score"><?php echo $hasil[0]['nilai']; ?></div>
       </div>
       <?php endif; ?>
-      <div class="card">
+
+      <!-- Tabel Ranking -->
+      <div class="card" style="margin-bottom:24px;">
         <div class="card-head">
           <div class="card-head-title">Ranking Aparatur</div>
           <span class="badge badge-green"><?php echo count($hasil); ?> Aparatur</span>
@@ -96,13 +199,14 @@ usort($hasil, function ($a, $b) { return $b['nilai'] <=> $a['nilai']; });
               <tr>
                 <th style="width:80px; text-align:center">Ranking</th>
                 <th>Nama Aparatur</th>
+                <th>Jabatan</th>
                 <th style="width:200px">Nilai SAW</th>
                 <th style="width:120px; text-align:center">Keterangan</th>
               </tr>
             </thead>
             <tbody>
               <?php if (empty($hasil)): ?>
-                <tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">&#127942;</div><div class="empty-state-title">Belum ada data perhitungan</div><div class="empty-state-sub">Pastikan data aparatur, kriteria, dan penilaian sudah diisi</div></div></td></tr>
+                <tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">&#127942;</div><div class="empty-state-title">Belum ada data</div><div class="empty-state-sub">Pastikan aparatur sudah punya jobdesk yang disetujui</div></div></td></tr>
               <?php else: ?>
                 <?php $rank = 1; foreach ($hasil as $h): ?>
                 <tr>
@@ -114,10 +218,11 @@ usort($hasil, function ($a, $b) { return $b['nilai'] <=> $a['nilai']; });
                     <?php endif; ?>
                   </td>
                   <td style="font-weight:500"><?php echo htmlspecialchars($h['nama']); ?></td>
+                  <td><?php echo htmlspecialchars($h['jabatan']); ?></td>
                   <td>
                     <div class="score-wrap">
                       <div class="score-track"><div class="score-fill" style="width:<?php echo min(round($h['nilai']*100),100); ?>%"></div></div>
-                      <span class="score-num"><?php echo round($h['nilai'],3); ?></span>
+                      <span class="score-num"><?php echo $h['nilai']; ?></span>
                     </div>
                   </td>
                   <td class="text-center">
@@ -132,6 +237,54 @@ usort($hasil, function ($a, $b) { return $b['nilai'] <=> $a['nilai']; });
           </table>
         </div>
       </div>
+
+      <!-- Detail per aparatur -->
+      <div class="page-sub mb-2" style="font-weight:600; color:var(--gray-700);">Detail Perhitungan per Aparatur</div>
+      <?php foreach ($hasil as $h): ?>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-head">
+          <div class="card-head-title"><?php echo htmlspecialchars($h['nama']); ?> — <?php echo htmlspecialchars($h['jabatan']); ?></div>
+          <span class="badge badge-green">Total: <?php echo $h['nilai']; ?></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Kriteria</th>
+                <th style="width:80px">Atribut</th>
+                <th style="width:80px; text-align:center">Nilai</th>
+                <th style="width:80px; text-align:center">Bobot</th>
+                <th style="width:110px; text-align:center">Normalisasi</th>
+                <th style="width:100px; text-align:center">Skor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($h['detail'] as $d): ?>
+              <tr>
+                <td style="font-weight:500"><?php echo htmlspecialchars($d['nama']); ?></td>
+                <td>
+                  <?php if (strtolower($d['atribut']) == 'benefit'): ?>
+                    <span class="badge badge-green">Benefit</span>
+                  <?php else: ?>
+                    <span class="badge badge-red">Cost</span>
+                  <?php endif; ?>
+                </td>
+                <td class="text-center"><span class="badge badge-gray"><?php echo $d['nilai']; ?></span></td>
+                <td class="text-center"><?php echo $d['bobot']; ?></td>
+                <td class="text-center"><?php echo $d['normalisasi']; ?></td>
+                <td class="text-center"><strong><?php echo $d['skor']; ?></strong></td>
+              </tr>
+              <?php endforeach; ?>
+              <tr style="background:var(--green-pale);">
+                <td colspan="5" style="font-weight:700; text-align:right; padding-right:16px;">Total Nilai SAW</td>
+                <td class="text-center"><strong style="color:var(--green-dark);"><?php echo $h['nilai']; ?></strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <?php endforeach; ?>
+
     </main>
   </div>
 </div>

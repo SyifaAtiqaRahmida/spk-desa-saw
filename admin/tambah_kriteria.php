@@ -30,8 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
       <a href="index.php">&#9632; Dashboard</a>
       <a href="aparatur.php">&#9632; Data Aparatur</a>
       <a href="kriteria.php" class="active">&#9632; Data Kriteria</a>
-      <a href="kehadiran.php">&#9632; Kehadiran</a>
-      <a href="penilaian.php">&#9632; Penilaian</a>
+      <a href="kehadiran.php">&#9632; Ketidakhadiran</a>
+      <a href="penilaian.php">&#9632; Rekap Penilaian</a>
       <a href="perhitungan_saw.php">&#9632; Perhitungan SAW</a>
       <a href="kelola_user.php">&#9632; Kelola User</a>
       <div class="nav-section">Akun</div>
@@ -62,12 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
           <form method="POST">
             <div class="form-group">
               <label class="form-label">Nama Kriteria</label>
-              <input type="text" name="nama_kriteria" class="form-control" placeholder="Contoh: Kedisiplinan, Prestasi Kerja..." required>
+              <input type="text" name="nama_kriteria" class="form-control" placeholder="Contoh: Kualitas Kerja, Kerja Sama..." required>
             </div>
             <div class="form-group">
               <label class="form-label">Bobot (0 - 1)</label>
               <input type="number" name="bobot" class="form-control" placeholder="Contoh: 0.25" step="0.01" min="0" max="1" required>
-              <div class="form-hint">Total bobot semua kriteria sebaiknya = 1</div>
+              <div class="form-hint">Total bobot semua kriteria harus = 1</div>
             </div>
             <div class="form-group">
               <label class="form-label">Atribut</label>
